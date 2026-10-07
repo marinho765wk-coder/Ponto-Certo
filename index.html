@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ponto Certo — Diclofenaco IM</title>
+<style>
+  :root{
+    --bg-deep:#0B2A38;
+    --bg-mid:#0F3B4C;
+    --bg-glow:#134A5C;
+    --panel:#0E3040cc;
+    --panel-border:#2E6478;
+    --text-light:#EAF4F2;
+    --text-muted:#9FC3C9;
+    --accent-drug:#F2A65A;
+    --accent-drug-dim:#7A5A34;
+    --accent-success:#4FB286;
+    --accent-success-dim:#1F4A3A;
+    --accent-danger:#E5573F;
+    --accent-danger-dim:#5A231B;
+    --track:#0A2129;
+  }
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --panel:#0E3040e6;
+    --text-muted:#C4DEE1;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --panel:#0E3040e6;
+      --text-muted:#C4DEE1;
+    }
+  }
+
+  /* paleta de urgencia usada nos 30s finais (Hora do Rush) */
+  body.rush-mode{
+    --bg-deep:#3B0B12;
+    --bg-mid:#4C0F15;
+    --bg-glow:#6B1620;
+    --panel:#3A0E14cc;
+    --panel-border:#C24A37;
+    --accent-drug:#FF8A4C;
+    --accent-success:#6FD19B;
+    --accent-danger:#FF5C4D;
+    --track:#2A0810;
+  }
+  body, .game-wrap, .hud-item, .falling-item{
+    transition: background 900ms ease, border-color 900ms ease, color 900ms ease;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    padding:0;
+    background:var(--bg-deep);
+    color:var(--text-light);
+    font-family:'IBM Plex Sans', -apple-system, Segoe UI, sans-serif;
+    overflow-x:hidden;
+    -webkit-tap-highlight-color:transparent;
+  }
+  body{
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    background:
+      radial-gradient(circle at 20% 10%, var(--bg-glow) 0%, transparent 45%),
+      radial-gradient(circle at 85% 85%, #0d4152 0%, transparent 50%),
+      linear-gradient(180deg, var(--bg-deep), #081C26);
+  }
+
+  .stage{
+    width:100%;
+    max-width:720px;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    padding:14px 14px 20px;
+  }
+
+  /* decorative floating background icons */
+  .bg-float{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    overflow:hidden;
+    z-index:0;
+  }
+  .bg-float span{
+    position:absolute;
+    font-size:28px;
+    opacity:0.08;
+    animation:drift linear infinite;
+    filter:grayscale(0.3);
+  }
+  @keyframes drift{
+    from{ transform:translateY(110vh) rotate(0deg); }
+    to{ transform:translateY(-15vh) rotate(30deg); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .bg-float span{animation:none; display:none;}
+  }
+
+  header.top{
+    position:relative;
+    z-index:2;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    margin-bottom:10px;
+  }
+  .eyebrow-row{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:10px;
+  }
+  h1{
+    font-family:Fraunces, Georgia, serif;
+    font-weight:600;
+    font-style:italic;
+    font-size:clamp(26px,7vw,36px);
+    margin:0;
+    letter-spacing:0.2px;
+    color:var(--text-light);
+  }
+  h1 .hi{ color:var(--accent-drug); font-style:normal; }
+  .subtitle{
+    color:var(--text-muted);
+    font-size:14px;
+    max-width:46ch;
+    line-height:1.5;
+    margin:2px 0 0;
+  }
+
+  .hud{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+    flex-wrap:wrap;
+  }
+  .hud-item{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:8px 12px;
+    flex:1;
+    min-width:90px;
+    backdrop-filter:blur(6px);
+  }
+  .hud-item .label{
+    font-size:11px;
+    color:var(--text-muted);
+    display:block;
+    margin-bottom:2px;
+  }
+  .hud-item .value{
+    font-size:18px;
+    font-weight:600;
+    font-variant-numeric:tabular-nums;
+  }
+  .doses{ display:flex; gap:5px; margin-top:2px; }
+  .dose-dot{
+    width:12px;height:12px;border-radius:50%;
+    background:var(--accent-drug);
+    box-shadow:0 0 6px var(--accent-drug);
+  }
+  .dose-dot.spent{ background:#2b3c40; box-shadow:none; }
+
+  .game-wrap{
+    position:relative;
+    flex:1;
+    margin-top:12px;
+    border-radius:16px;
+    border:1px solid var(--panel-border);
+    background:
+      linear-gradient(180deg, #0c3140 0%, #0a2733 70%, #082027 100%);
+    overflow:hidden;
+    min-height:440px;
+    touch-action:none;
+    z-index:1;
+    transition: background 900ms ease, border-color 900ms ease;
+  }
+  body.rush-mode .game-wrap{
+    background:
+      linear-gradient(180deg, #4a0f14 0%, #370a10 70%, #230609 100%);
+  }
+  .muscle-cross{
+    position:absolute;
+    bottom:0; left:0; right:0;
+    height:70px;
+    background:
+      repeating-linear-gradient(100deg, #7a2f2a 0 14px, #6b2824 14px 28px);
+    opacity:0.35;
+    mask-image:linear-gradient(180deg, transparent, black 60%);
+  }
+
+  #gameArea{
+    position:absolute; inset:0;
+  }
+
+  .falling-item{
+    position:absolute;
+    width:112px;
+    padding:6px 8px;
+    border-radius:11px;
+    font-size:10.5px;
+    line-height:1.32;
+    text-align:center;
+    color:#12262d;
+    font-weight:600;
+    box-shadow:0 4px 14px rgba(0,0,0,0.35);
+    user-select:none;
+    will-change:transform;
+    background:linear-gradient(160deg,#E7EFEE,#C9D9DA);
+    border:1px solid #4C7680;
+  }
+  body.rush-mode .falling-item{
+    background:linear-gradient(160deg,#FFDCC9,#FFB199);
+    border:1px solid #C24A37;
+    color:#3B0B12;
+  }
+
+  #basket{
+    position:absolute;
+    bottom:14px;
+    width:96px;
+    height:74px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:3;
+  }
+  #basket svg{ width:100%; height:100%; display:block; filter:drop-shadow(0 6px 10px rgba(0,0,0,0.4)); }
+
+  .floaters{
+    position:absolute; inset:0; pointer-events:none;
+  }
+  .float-pop{
+    position:absolute;
+    font-size:13px;
+    font-weight:700;
+    animation:popUp 700ms ease-out forwards;
+  }
+  @keyframes popUp{
+    from{ opacity:1; transform:translateY(0); }
+    to{ opacity:0; transform:translateY(-38px); }
+  }
+
+  .rush-banner{
+    position:absolute;
+    left:50%; top:38%;
+    transform:translate(-50%,-50%) scale(0.7);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    z-index:6;
+    pointer-events:none;
+    opacity:0;
+  }
+  .rush-banner.show{
+    animation: rushPop 2.6s ease forwards;
+  }
+  .rush-banner .rush-main{
+    font-family:Fraunces, serif;
+    font-style:italic;
+    font-weight:700;
+    font-size:clamp(30px,9vw,46px);
+    color:#FF5C4D;
+    text-shadow:0 0 18px rgba(255,92,77,0.85), 0 2px 4px rgba(0,0,0,0.6);
+    letter-spacing:1px;
+  }
+  .rush-banner .rush-sub{
+    font-size:13.5px;
+    color:#FFE3D6;
+    background:rgba(42,8,16,0.75);
+    padding:4px 12px;
+    border-radius:999px;
+    border:1px solid #C24A37;
+  }
+  @keyframes rushPop{
+    0%   { opacity:0; transform:translate(-50%,-50%) scale(0.6); }
+    12%  { opacity:1; transform:translate(-50%,-50%) scale(1.08); }
+    20%  { transform:translate(-50%,-50%) scale(1); }
+    30%,34%{ transform:translate(-50%,-50%) scale(1.04); }
+    80%  { opacity:1; transform:translate(-50%,-50%) scale(1); }
+    100% { opacity:0; transform:translate(-50%,-50%) scale(1); }
+  }
+
+  .overlay{
+    position:absolute; inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(6,20,26,0.82);
+    backdrop-filter:blur(3px);
+    z-index:5;
+    padding:18px;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:16px;
+    padding:22px 20px;
+    max-width:440px;
+    width:100%;
+    text-align:left;
+  }
+  .card h2{
+    font-family:Fraunces, serif;
+    font-style:italic;
+    font-weight:600;
+    margin:0 0 10px;
+    font-size:22px;
+    color:var(--accent-drug);
+  }
+  .card p{ color:var(--text-muted); font-size:14px; line-height:1.55; margin:0 0 10px;}
+  .legend-row{ display:flex; gap:8px; align-items:center; font-size:13px; margin:6px 0; color:var(--text-light);}
+  .swatch{ width:14px;height:14px;border-radius:4px;flex:none; }
+  .swatch.fact{background:#B9DCC9;border:1px solid #3f8464;}
+  .swatch.myth{background:#EDB49B;border:1px solid #b3543a;}
+  .btn{
+    appearance:none;
+    border:none;
+    cursor:pointer;
+    border-radius:999px;
+    padding:12px 22px;
+    font-size:14.5px;
+    font-weight:600;
+    font-family:inherit;
+    background:var(--accent-drug);
+    color:#20140a;
+    margin-top:8px;
+  }
+  .btn:active{ transform:translateY(1px); }
+  .btn.secondary{
+    background:transparent;
+    border:1px solid var(--panel-border);
+    color:var(--text-light);
+  }
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;}
+
+  .recap-list{ list-style:none; padding:0; margin:0 0 12px; max-height:200px; overflow-y:auto;}
+  .recap-list li{
+    font-size:13px;
+    padding:7px 0;
+    border-bottom:1px solid var(--panel-border);
+    color:var(--text-light);
+    display:flex;
+    gap:8px;
+  }
+  .recap-list li .ic{ flex:none; }
+
+  .toolbar{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:10px;
+  }
+  .icon-btn{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    color:var(--text-light);
+    width:38px;height:38px;
+    border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    font-size:16px;
+  }
+  footer.hint{
+    text-align:center;
+    color:var(--text-muted);
+    font-size:11.5px;
+    margin-top:8px;
+    opacity:0.8;
+  }
+
+  @media (max-width:420px){
+    .falling-item{ width:96px; font-size:9.8px; padding:5px 7px;}
+    #basket{ width:80px; height:66px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-float" id="bgFloat" aria-hidden="true"></div>
+
+<div class="stage">
+  <header class="top">
+    <div class="eyebrow-row">
+      <h1>Ponto <span class="hi">Certo</span></h1>
+      <div class="toolbar">
+        <button class="icon-btn" id="muteBtn" title="Som">🔊</button>
+      </div>
+    </div>
+    <p class="subtitle">Colete os fatos certos sobre a via intramuscular e o diclofenaco IM. Desvie dos mitos — eles custam vida.</p>
+  </header>
+
+  <div class="hud">
+    <div class="hud-item">
+      <span class="label">Pontuação</span>
+      <span class="value" id="scoreVal">0</span>
+    </div>
+    <div class="hud-item">
+      <span class="label">Tempo</span>
+      <span class="value" id="timeVal">75</span>
+    </div>
+    <div class="hud-item">
+      <span class="label">Doses restantes</span>
+      <div class="doses" id="dosesRow"></div>
+    </div>
+  </div>
+
+  <div class="game-wrap" id="gameWrap">
+    <div id="gameArea">
+      <div class="muscle-cross"></div>
+      <div class="floaters" id="floaters"></div>
+      <div id="rushBanner" class="rush-banner">
+        <span class="rush-main">HORA DO RUSH</span>
+        <span class="rush-sub">As sentenças vêm cada vez mais rápido!</span>
+      </div>
+      <div id="basket">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <!-- sombra -->
+          <ellipse cx="50" cy="95" rx="26" ry="5" fill="#04141a" opacity="0.35"/>
+          <!-- pernas -->
+          <rect x="38" y="72" width="9" height="18" rx="3" fill="#173B45"/>
+          <rect x="53" y="72" width="9" height="18" rx="3" fill="#173B45"/>
+          <!-- jaleco -->
+          <path d="M30 40 L34 30 C40 25 60 25 66 30 L70 40 L74 78 C74 84 26 84 26 78 Z" fill="#F3F7F6" stroke="#4C7680" stroke-width="2"/>
+          <rect x="47" y="38" width="6" height="34" fill="#DCE7E4"/>
+          <!-- braco esquerdo segurando o pilao -->
+          <path d="M32 45 C22 48 18 56 20 64" stroke="#F3F7F6" stroke-width="9" stroke-linecap="round" fill="none"/>
+          <path d="M32 45 C22 48 18 56 20 64" stroke="#4C7680" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <!-- braco direito segurando o pilao -->
+          <path d="M68 45 C78 48 82 56 80 64" stroke="#F3F7F6" stroke-width="9" stroke-linecap="round" fill="none"/>
+          <path d="M68 45 C78 48 82 56 80 64" stroke="#4C7680" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <!-- gral e pistilo (simbolo da farmacia) -->
+          <ellipse cx="50" cy="66" rx="16" ry="9" fill="#7A9AA3"/>
+          <path d="M36 66 C36 76 64 76 64 66 L64 70 C64 80 36 80 36 70 Z" fill="#4C7680"/>
+          <circle cx="55" cy="58" r="4" fill="#F2A65A" stroke="#4C7680" stroke-width="1.5"/>
+          <!-- cabeca -->
+          <circle cx="50" cy="20" r="14" fill="#E8B58C"/>
+          <path d="M36 16 C36 6 64 6 64 16 C64 10 58 8 50 8 C42 8 36 10 36 16 Z" fill="#2E211A"/>
+          <!-- oculos -->
+          <circle cx="44" cy="21" r="3.4" fill="none" stroke="#2E211A" stroke-width="1.6"/>
+          <circle cx="56" cy="21" r="3.4" fill="none" stroke="#2E211A" stroke-width="1.6"/>
+          <line x1="47.4" y1="21" x2="52.6" y2="21" stroke="#2E211A" stroke-width="1.6"/>
+          <!-- sorriso -->
+          <path d="M45 27 Q50 30 55 27" stroke="#8a5236" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+          <!-- crachá -->
+          <rect x="43" y="46" width="10" height="7" rx="1.5" fill="#4FB286"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <h2>Ponto Certo: Diclofenaco Intramuscular</h2>
+        <p>Chips caem devagar, todos com a mesma cor — não dá pra adivinhar pela aparência. Leia cada afirmação e decida rápido: mova a farmacêutica para coletar os <strong>fatos corretos</strong> sobre técnica IM e diclofenaco, e desvie dos <strong>mitos</strong> — cada um custa uma dose de vida.</p>
+        <p>Nos últimos 30 segundos entra a <strong>Hora do Rush</strong>: a tela muda de cor e as sentenças caem cada vez mais rápido.</p>
+        <p>Controles: setas ← → ou A/D no teclado, ou arraste com o dedo/mouse na área do jogo.</p>
+        <div class="btn-row">
+          <button class="btn" id="startBtn">Iniciar aplicação</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="endOverlay" style="display:none;">
+      <div class="card">
+        <h2 id="endTitle">Fim de turno</h2>
+        <p id="endSubtitle"></p>
+        <p style="margin-top:14px; color:var(--text-light); font-weight:600;">Fatos que você reteve:</p>
+        <ul class="recap-list" id="recapList"></ul>
+        <div class="btn-row">
+          <button class="btn" id="restartBtn">Jogar de novo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="hint">Conteúdo educativo — não substitui orientação de enfermagem/farmácia sobre técnica de aplicação real.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- content ---------- */
+  var FACTS = [
+    "A via intramuscular deposita o medicamento diretamente no tecido muscular, onde a absorção é rica em vasos sanguíneos.",
+    "O ventroglúteo é considerado um dos locais mais seguros para aplicação IM em adultos.",
+    "A técnica em Z reduz o refluxo do medicamento pelo trajeto da agulha após a injeção.",
+    "O ângulo padrão de introdução da agulha na via IM é de 90 graus em relação à pele.",
+    "O diclofenaco IM é um anti-inflamatório não esteroidal (AINE) usado para dor e inflamação.",
+    "A aplicação de diclofenaco IM deve ser profunda, no quadrante superior externo do glúteo.",
+    "Aplicações repetidas de diclofenaco no mesmo ponto podem causar abscesso ou necrose local.",
+    "O diclofenaco IM é contraindicado em pacientes com histórico de alergia a AINEs.",
+    "O músculo deltoide comporta volumes pequenos, geralmente até cerca de 2 mL.",
+    "O diclofenaco não deve ser administrado por via endovenosa acidental — por isso a aspiração antes de injetar é uma etapa da técnica.",
+    "Gestantes no terceiro trimestre geralmente devem evitar AINEs como o diclofenaco.",
+    "Rodar os locais de aplicação ajuda a prevenir lesão tecidual cumulativa.",
+    "O comprimento da agulha IM varia conforme o local, a idade e a massa muscular do paciente."
+  ];
+
+  var MYTHS = [
+    "A via intramuscular deve ser aplicada com um ângulo de 15 graus, quase raspando a pele.",
+    "Qualquer volume de medicamento pode ser aplicado no deltoide, mesmo acima de 5 mL.",
+    "O diclofenaco intramuscular pode ser aplicado direto na veia sem nenhum problema.",
+    "Não existe risco de atingir o nervo ciático ao aplicar no dorsoglúteo.",
+    "A técnica em Z deve ser evitada porque só serve para aumentar a dor.",
+    "O diclofenaco IM pode ser usado livremente em qualquer trimestre da gravidez.",
+    "Não é necessário trocar o local de aplicação em ciclos repetidos de diclofenaco.",
+    "A via intramuscular sempre tem absorção mais lenta que a via oral."
+  ];
+
+  function shuffled(arr){
+    var a = arr.slice();
+    for(var i=a.length-1;i>0;i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var t=a[i]; a[i]=a[j]; a[j]=t;
+    }
+    return a;
+  }
+
+  /* ---------- background floaters ---------- */
+  var bgFloat = document.getElementById('bgFloat');
+  var icons = ['💉','🩹','🏥','⚕️','💊'];
+  for(var i=0;i<10;i++){
+    var s = document.createElement('span');
+    s.textContent = icons[i % icons.length];
+    s.style.left = (Math.random()*100)+'%';
+    s.style.animationDuration = (14+Math.random()*14)+'s';
+    s.style.animationDelay = (-Math.random()*20)+'s';
+    s.style.fontSize = (18+Math.random()*22)+'px';
+    bgFloat.appendChild(s);
+  }
+
+  /* ---------- audio: tiny procedural theme ---------- */
+  var actx = null, musicOn = true, musicTimer = null, musicStep = 0;
+  var musicStepDur = 0.30;
+  var ORIG_BASS  = [98.00, 98.00, 110.00, 87.31, 98.00, 98.00, 130.81, 110.00];
+  var ORIG_LEAD  = [392.00, 440.00, 523.25, 392.00, 440.00, 523.25, 587.33, 523.25];
+  var bassNotes  = ORIG_BASS.slice();
+  var leadNotes  = ORIG_LEAD.slice();
+
+  function ensureAudio(){
+    if(!actx){
+      try{ actx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){ actx = null; }
+    }
+  }
+  function playTone(freq, time, dur, type, gainVal){
+    if(!actx) return;
+    var osc = actx.createOscillator();
+    var gain = actx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, time);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(gainVal, time+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time+dur);
+    osc.connect(gain); gain.connect(actx.destination);
+    osc.start(time); osc.stop(time+dur+0.02);
+  }
+  function scheduleMusic(){
+    if(!actx || !musicOn) return;
+    var stepDur = musicStepDur;
+    var t = actx.currentTime + 0.05;
+    for(var k=0;k<8;k++){
+      var idx = (musicStep + k) % bassNotes.length;
+      playTone(bassNotes[idx], t + k*stepDur, stepDur*0.9, 'triangle', 0.05);
+      if(k % 2 === 0){
+        playTone(leadNotes[idx], t + k*stepDur, stepDur*0.5, 'square', 0.025);
+      }
+    }
+    musicStep += 8;
+  }
+  function startMusic(){
+    ensureAudio();
+    if(!actx) return;
+    if(actx.state === 'suspended') actx.resume();
+    scheduleMusic();
+    clearInterval(musicTimer);
+    musicTimer = setInterval(scheduleMusic, 8*musicStepDur*1000);
+  }
+  function rushTempoUp(){
+    // acelera e agudiza a trilha para dar urgencia na Hora do Rush
+    musicStepDur = 0.21;
+    bassNotes = bassNotes.map(function(f){ return f*1.19; });
+    leadNotes = leadNotes.map(function(f){ return f*1.19; });
+    if(musicOn && actx){
+      clearInterval(musicTimer);
+      musicTimer = setInterval(scheduleMusic, 8*musicStepDur*1000);
+    }
+  }
+  function stopMusic(){
+    clearInterval(musicTimer);
+  }
+  function chime(good){
+    ensureAudio();
+    if(!actx) return;
+    var t = actx.currentTime;
+    if(good){
+      playTone(880, t, 0.12, 'square', 0.06);
+      playTone(1174.66, t+0.09, 0.16, 'square', 0.05);
+    } else {
+      playTone(180, t, 0.22, 'sawtooth', 0.08);
+    }
+  }
+
+  var muteBtn = document.getElementById('muteBtn');
+  muteBtn.addEventListener('click', function(){
+    musicOn = !musicOn;
+    muteBtn.textContent = musicOn ? '🔊' : '🔇';
+    if(musicOn){ startMusic(); } else { stopMusic(); }
+  });
+
+  /* ---------- game state ---------- */
+  var gameWrap = document.getElementById('gameWrap');
+  var gameArea = document.getElementById('gameArea');
+  var basket = document.getElementById('basket');
+  var floatersEl = document.getElementById('floaters');
+  var scoreVal = document.getElementById('scoreVal');
+  var timeVal = document.getElementById('timeVal');
+  var dosesRow = document.getElementById('dosesRow');
+  var startOverlay = document.getElementById('startOverlay');
+  var endOverlay = document.getElementById('endOverlay');
+  var startBtn = document.getElementById('startBtn');
+  var restartBtn = document.getElementById('restartBtn');
+
+  var LIVES_MAX = 3;
+  var GAME_SECONDS = 75;
+  var RUSH_SECONDS = 30;
+  var TOTAL_SECONDS = GAME_SECONDS + RUSH_SECONDS;
+
+  var state = null;
+
+  function resetDoseDots(lives){
+    dosesRow.innerHTML = '';
+    for(var i=0;i<LIVES_MAX;i++){
+      var d = document.createElement('div');
+      d.className = 'dose-dot' + (i < lives ? '' : ' spent');
+      dosesRow.appendChild(d);
+    }
+  }
+
+  function makeState(){
+    return {
+      running:false,
+      score:0,
+      lives:LIVES_MAX,
+      timeLeft:TOTAL_SECONDS,
+      basketX: gameArea.clientWidth/2,
+      targetX: gameArea.clientWidth/2,
+      items:[],
+      learned:{},
+      spawnEvery:3200,
+      lastSpawn:0,
+      maxOnScreen:2,
+      fallSpeed:34,  // px/sec
+      lastTick:0,
+      rushActive:false,
+      pool: shuffled(FACTS.concat(MYTHS).map(function(text){
+        return {text:text, correct: FACTS.indexOf(text) !== -1};
+      })),
+      poolIdx:0,
+      timerHandle:null
+    };
+  }
+
+  function pickItem(){
+    if(state.poolIdx >= state.pool.length){
+      state.pool = shuffled(state.pool);
+      state.poolIdx = 0;
+    }
+    return state.pool[state.poolIdx++];
+  }
+
+  function pickSpawnX(itemW){
+    var areaW = gameArea.clientWidth;
+    var maxX = Math.max(10, areaW - itemW - 10);
+    var minGap = itemW + 26; // distancia minima entre centros de itens proximos ao topo
+    for(var attempt=0; attempt<12; attempt++){
+      var x = Math.random() * maxX + 5;
+      var conflict = false;
+      for(var i=0;i<state.items.length;i++){
+        var it = state.items[i];
+        // so considera itens ainda perto do topo (pouco tempo de queda)
+        if(it.y < 160 && Math.abs((x+itemW/2) - (it.x+it.w/2)) < minGap){
+          conflict = true;
+          break;
+        }
+      }
+      if(!conflict) return x;
+    }
+    return null; // nao achou posicao livre nesta tentativa
+  }
+
+  function spawnItem(){
+    if(state.items.length >= state.maxOnScreen) return;
+    var itemW = (gameArea.clientWidth < 420) ? 96 : 112;
+    var x = pickSpawnX(itemW);
+    if(x === null) return; // adia o spawn para o proximo tick em vez de sobrepor
+    var def = pickItem();
+    var el = document.createElement('div');
+    el.className = 'falling-item';
+    var txt = document.createElement('span');
+    txt.textContent = def.text;
+    el.appendChild(txt);
+    el.style.left = x + 'px';
+    el.style.top = '-90px';
+    gameArea.appendChild(el);
+    state.items.push({el:el, y:-90, x:x, w:itemW, correct:def.correct, text:def.text, caught:false});
+  }
+
+  function popFloat(text, x, y, color){
+    var p = document.createElement('div');
+    p.className = 'float-pop';
+    p.textContent = text;
+    p.style.left = x+'px';
+    p.style.top = y+'px';
+    p.style.color = color;
+    floatersEl.appendChild(p);
+    setTimeout(function(){ p.remove(); }, 750);
+  }
+
+  function updateHud(){
+    scoreVal.textContent = state.score;
+    timeVal.textContent = Math.ceil(state.timeLeft);
+    resetDoseDots(state.lives);
+  }
+
+  function endGame(reason){
+    state.running = false;
+    clearInterval(state.timerHandle);
+    var title = reason === 'time' ? 'Turno concluído' : 'Sem doses restantes';
+    var sub = reason === 'time'
+      ? (state.rushActive
+          ? 'Você sobreviveu à Hora do Rush! Pontuação final: ' + state.score + '.'
+          : 'O tempo acabou. Pontuação final: ' + state.score + '.')
+      : 'Você errou mitos demais. Pontuação final: ' + state.score + '.';
+    document.getElementById('endTitle').textContent = title;
+    document.getElementById('endSubtitle').textContent = sub;
+
+    var list = document.getElementById('recapList');
+    list.innerHTML = '';
+    var learnedTexts = Object.keys(state.learned);
+    if(learnedTexts.length === 0){
+      var li = document.createElement('li');
+      li.innerHTML = '<span class="ic">—</span> Nenhum fato coletado desta vez. Tente de novo!';
+      list.appendChild(li);
+    } else {
+      learnedTexts.forEach(function(t){
+        var li = document.createElement('li');
+        li.innerHTML = '<span class="ic">✅</span><span>' + t + '</span>';
+        list.appendChild(li);
+      });
+    }
+    endOverlay.style.display = 'flex';
+    if(musicOn) stopMusic();
+  }
+
+  function loop(ts){
+    if(!state.running) return;
+    if(!state.lastTick) state.lastTick = ts;
+    var dt = (ts - state.lastTick)/1000;
+    state.lastTick = ts;
+
+    // ease basket toward target
+    state.basketX += (state.targetX - state.basketX) * Math.min(1, dt*10);
+    var bw = basket.offsetWidth;
+    var maxX = gameArea.clientWidth - bw/2;
+    var minX = bw/2;
+    state.basketX = Math.max(minX, Math.min(maxX, state.basketX));
+    basket.style.left = state.basketX + 'px';
+
+    // spawn
+    state.lastSpawn += dt*1000;
+    if(state.lastSpawn > state.spawnEvery){
+      state.lastSpawn = 0;
+      spawnItem();
+    }
+
+    // move items
+    var areaH = gameArea.clientHeight;
+    var basketTop = areaH - 14 - 74*0.55;
+    var basketLeft = state.basketX - bw*0.42;
+    var basketRight = state.basketX + bw*0.42;
+
+    for(var i = state.items.length-1; i>=0; i--){
+      var it = state.items[i];
+      if(it.caught) continue;
+      it.y += state.fallSpeed * dt;
+      it.el.style.transform = 'translateY(' + it.y + 'px)';
+
+      var itemBottom = it.y + 54; // approx item height
+      var itemCenter = it.x + it.w/2;
+
+      if(itemBottom >= basketTop && it.y < basketTop + 40 &&
+         itemCenter > basketLeft && itemCenter < basketRight){
+        it.caught = true;
+        if(it.correct){
+          state.score += 15;
+          state.learned[it.text] = true;
+          popFloat('+15', it.x + it.w/2, areaH - 120, '#4FB286');
+          chime(true);
+        } else {
+          state.score = Math.max(0, state.score - 5);
+          state.lives -= 1;
+          popFloat('-1 dose', it.x + it.w/2, areaH - 120, '#E5573F');
+          chime(false);
+          gameWrap.style.transform = 'translateX(-4px)';
+          setTimeout(function(){ gameWrap.style.transform=''; }, 90);
+        }
+        it.el.remove();
+        state.items.splice(i,1);
+        updateHud();
+        if(state.lives <= 0){
+          endGame('lives');
+          return;
+        }
+        continue;
+      }
+
+      if(it.y > areaH + 10){
+        it.el.remove();
+        state.items.splice(i,1);
+      }
+    }
+
+    // ramp difficulty (suave, mantendo tempo de leitura)
+    var elapsedTotal = TOTAL_SECONDS - state.timeLeft;
+    var elapsedNormal = Math.min(elapsedTotal, GAME_SECONDS);
+    if(!state.rushActive){
+      state.fallSpeed = 34 + elapsedNormal * 0.45;
+      state.spawnEvery = Math.max(2200, 3200 - elapsedNormal*10);
+    } else {
+      var elapsedRush = Math.max(0, elapsedTotal - GAME_SECONDS);
+      // cresce bem mais rapido a cada segundo dentro da Hora do Rush
+      state.fallSpeed = 68 + elapsedRush * 1.8;
+      state.spawnEvery = Math.max(850, 1700 - elapsedRush*32);
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  function showRushBanner(){
+    var el = document.getElementById('rushBanner');
+    el.classList.remove('show');
+    void el.offsetWidth; // reinicia a animacao
+    el.classList.add('show');
+  }
+
+  function activateRush(){
+    if(state.rushActive) return;
+    state.rushActive = true;
+    state.maxOnScreen = 3;
+    document.body.classList.add('rush-mode');
+    showRushBanner();
+    rushTempoUp();
+  }
+
+  function tickTimer(){
+    if(!state.running) return;
+    state.timeLeft -= 1;
+    if(!state.rushActive && state.timeLeft <= RUSH_SECONDS){
+      activateRush();
+    }
+    updateHud();
+    if(state.timeLeft <= 0){
+      endGame('time');
+    }
+  }
+
+  function clearItems(){
+    state.items.forEach(function(it){ it.el.remove(); });
+  }
+
+  function startGame(){
+    if(state) clearItems();
+    document.body.classList.remove('rush-mode');
+    document.getElementById('rushBanner').classList.remove('show');
+    musicStepDur = 0.30;
+    bassNotes = ORIG_BASS.slice();
+    leadNotes = ORIG_LEAD.slice();
+    state = makeState();
+    updateHud();
+    endOverlay.style.display = 'none';
+    startOverlay.style.display = 'none';
+    state.running = true;
+    state.lastTick = 0;
+    if(musicOn) startMusic();
+    state.timerHandle = setInterval(tickTimer, 1000);
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------- controls ---------- */
+  var keys = {left:false, right:false};
+  window.addEventListener('keydown', function(e){
+    if(!state || !state.running) return;
+    if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+    if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+  });
+  window.addEventListener('keyup', function(e){
+    if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+    if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+  });
+  setInterval(function(){
+    if(!state || !state.running) return;
+    var speed = 9;
+    if(keys.left) state.targetX -= speed;
+    if(keys.right) state.targetX += speed;
+    state.targetX = Math.max(0, Math.min(gameArea.clientWidth, state.targetX));
+  }, 16);
+
+  function pointerToX(e){
+    var rect = gameArea.getBoundingClientRect();
+    var clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    return clientX - rect.left;
+  }
+  var dragging = false;
+  gameArea.addEventListener('pointerdown', function(e){
+    dragging = true;
+    state && (state.targetX = pointerToX(e));
+  });
+  gameArea.addEventListener('pointermove', function(e){
+    if(!dragging || !state) return;
+    state.targetX = pointerToX(e);
+  });
+  window.addEventListener('pointerup', function(){ dragging = false; });
+
+  /* ---------- boot ---------- */
+  state = makeState();
+  updateHud();
+
+  startBtn.addEventListener('click', function(){
+    ensureAudio();
+    startGame();
+  });
+  restartBtn.addEventListener('click', function(){
+    ensureAudio();
+    startGame();
+  });
+
+  window.addEventListener('resize', function(){
+    if(state){
+      state.basketX = Math.min(state.basketX, gameArea.clientWidth);
+      state.targetX = state.basketX;
+    }
+  });
+})();
+</script>
+</body>
+</html>
